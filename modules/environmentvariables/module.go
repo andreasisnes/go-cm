@@ -1,4 +1,4 @@
-package gonfigenvironmentvariables
+package environmentvariables
 
 import (
 	"os"

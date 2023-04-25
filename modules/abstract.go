@@ -8,8 +8,8 @@ type Module interface {
 	Get(key string) any
 	GetKeys() []string
 	GetOptions() *Options
-	GetRefreshedValue(key string) any
 
+	GetRefreshedValue(key string) any
 	Load()
 	Deconstruct()
 }

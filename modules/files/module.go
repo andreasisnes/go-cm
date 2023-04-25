@@ -21,7 +21,7 @@ const (
 
 type Options struct {
 	modules.Options
-	Path string
+	File string
 }
 
 type Module struct {
@@ -33,10 +33,10 @@ type Module struct {
 	QuitC         chan interface{}
 }
 
-func NewFileSource(options *Options) modules.Module {
+func New(options *Options) modules.Module {
 	if options == nil {
 		options = &Options{
-			Path: DefaultFile,
+			File: DefaultFile,
 		}
 	}
 
@@ -64,12 +64,12 @@ func (source *Module) Deconstruct() {
 }
 
 func (source *Module) Load() {
-	if fileExists(source.FileOptions.Path) {
-		if content, err := os.ReadFile(source.FileOptions.Path); err != nil {
+	if fileExists(source.FileOptions.File) {
+		if content, err := os.ReadFile(source.FileOptions.File); err != nil {
 			panic(err)
 		} else {
 			source.Content = content
-			extension := strings.ToLower(path.Ext(source.FileOptions.Path))
+			extension := strings.ToLower(path.Ext(source.FileOptions.File))
 			switch extension {
 			case ".json":
 				source.unmarshal(json.Unmarshal)
@@ -79,7 +79,7 @@ func (source *Module) Load() {
 				source.unmarshal(toml.Unmarshal)
 			default:
 				if !source.FileOptions.Optional {
-					log.Fatalf("'%s' is not a <.json, yml, yaml, toml> file", path.Base(source.FileOptions.Path))
+					log.Fatalf("'%s' is not a <.json, yml, yaml, toml> file", path.Base(source.FileOptions.File))
 				}
 			}
 		}
@@ -127,7 +127,7 @@ func (source *Module) createWatcher() (*fsnotify.Watcher, bool) {
 		return nil, true
 	}
 
-	if !fileExists(source.FileOptions.Path) {
+	if !fileExists(source.FileOptions.File) {
 		if !source.FileOptions.Optional {
 			panic(os.ErrNotExist)
 		}
@@ -135,7 +135,7 @@ func (source *Module) createWatcher() (*fsnotify.Watcher, bool) {
 		return nil, true
 	}
 
-	if err = watcher.Add(source.FileOptions.Path); err != nil {
+	if err = watcher.Add(source.FileOptions.File); err != nil {
 		if !source.FileOptions.Optional {
 			panic(os.ErrNotExist)
 		}

@@ -15,35 +15,34 @@ var (
 	ErrPointerNotPassed = errors.New("pointer not passed")
 )
 
-type Configuration[T any] interface {
-	Bind(T)
-	Create() T
-	Get(key string, value interface{}) interface{}
-	Deconstruct() Configuration[T]
-	Refresh() (successfullyRefreshed bool)
-	Unmarshal(value interface{}) error
+type Configuration interface {
+	Get(key string, value any) any
+	Deconstruct() Configuration
+	Refresh() (isRefreshed bool)
+	Unmarshal(value any) error
 }
 
-type configuration[T any] struct {
-	RefreshC chan modules.Module
-	QuitC    chan struct{}
+type configuration struct {
+	refreshC chan modules.Module
+	quitC    chan struct{}
 
-	Waitgroup sync.WaitGroup
-	Sources   []modules.Module
-	Delimiter string
+	waitgroup sync.WaitGroup
+	modules   []modules.Module
+	delimiter string
 }
 
-func newConfiguration[T any](sources []modules.Module) Configuration[T] {
-	config := &configuration[T]{
-		Waitgroup: sync.WaitGroup{},
-		Sources:   sources,
-		Delimiter: ".",
-		RefreshC:  make(chan modules.Module),
-		QuitC:     make(chan struct{}),
+func newConfiguration(sources []modules.Module) Configuration {
+	config := &configuration{
+		waitgroup: sync.WaitGroup{},
+		modules:   sources,
+		delimiter: ".",
+		refreshC:  make(chan modules.Module),
+		quitC:     make(chan struct{}),
 	}
 
-	for _, source := range config.Sources {
-		source.Connect(config.RefreshC)
+	for _, source := range config.modules {
+		source.Load()
+		source.Connect(config.refreshC)
 	}
 
 	config.Refresh()
@@ -52,23 +51,25 @@ func newConfiguration[T any](sources []modules.Module) Configuration[T] {
 	return config
 }
 
-func (c *configuration) Get(key string, result interface{}) interface{} {
+// Get
+func (c *configuration) Get(key string, out any) any {
 	key = strings.ToUpper(key)
-	for idx := range c.Sources {
-		source := c.Sources[len(c.Sources)-1-idx]
+	for idx := range c.modules {
+		source := c.modules[len(c.modules)-1-idx]
 		if source.Exists(key) {
 			value := source.Get(key)
-			if result == nil {
+			if out == nil {
 				return value
 			}
 
-			return CastAndTryAssignValue(value, result)
+			return castAndTryAssignValue(value, out)
 		}
 	}
 
-	return result
+	return out
 }
 
+// Refresh
 func (c *configuration) Refresh() (successfullyRefreshed bool) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -80,7 +81,7 @@ func (c *configuration) Refresh() (successfullyRefreshed bool) {
 	}()
 
 	wg := sync.WaitGroup{}
-	for _, source := range c.Sources {
+	for _, source := range c.modules {
 		wg.Add(1)
 		go func(sourceArg modules.Module) {
 			defer wg.Done()
@@ -92,14 +93,15 @@ func (c *configuration) Refresh() (successfullyRefreshed bool) {
 	return successfullyRefreshed
 }
 
-func (c *configuration) Unmarshal(value interface{}) error {
+// Unmarshal
+func (c *configuration) Unmarshal(value any) error {
 	rv := reflect.ValueOf(value)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return ErrPointerNotPassed
 	}
 
 	keys := make(map[string]modules.Module)
-	for _, source := range c.Sources {
+	for _, source := range c.modules {
 		for _, key := range source.GetKeys() {
 			keys[key] = source
 		}
@@ -113,6 +115,7 @@ func (c *configuration) Unmarshal(value interface{}) error {
 	return nil
 }
 
+// Deconstruct
 func (c *configuration) Deconstruct() Configuration {
 	defer func() {
 		if r := recover(); r != nil {
@@ -120,9 +123,9 @@ func (c *configuration) Deconstruct() Configuration {
 		}
 	}()
 
-	c.QuitC <- struct{}{}
+	c.quitC <- struct{}{}
 	wg := sync.WaitGroup{}
-	for _, source := range c.Sources {
+	for _, source := range c.modules {
 		wg.Add(1)
 		go func(sourceArg modules.Module) {
 			defer wg.Done()
@@ -130,25 +133,25 @@ func (c *configuration) Deconstruct() Configuration {
 		}(source)
 	}
 	wg.Wait()
-	c.Waitgroup.Wait()
+	c.waitgroup.Wait()
 
 	return c
 }
 
 func (c *configuration) autoRefresh() {
-	c.Waitgroup.Add(1)
-	defer c.Waitgroup.Done()
+	c.waitgroup.Add(1)
+	defer c.waitgroup.Done()
 
 	for {
 		select {
-		case source := <-c.RefreshC:
+		case source := <-c.refreshC:
 			if source.GetOptions().ReloadOnChange {
 				source.Load()
 			}
 			if source.GetOptions().SentinelOptions != nil {
 				c.loadSentinel(source)
 			}
-		case <-c.QuitC:
+		case <-c.quitC:
 			return
 		}
 	}
@@ -181,8 +184,8 @@ func (c *configuration) loadSentinel(source modules.Module) {
 func (c *configuration) refreshCurrentAndAbove(source modules.Module) {
 	wg := sync.WaitGroup{}
 	isAbove := false
-	for _, s := range c.Sources {
-		if s == source {
+	for _, module := range c.modules {
+		if module == source {
 			isAbove = true
 		}
 		if isAbove {
@@ -199,7 +202,7 @@ func (c *configuration) refreshCurrentAndAbove(source modules.Module) {
 func (c *configuration) refreshCurrentAndUnder(source modules.Module) {
 	wg := sync.WaitGroup{}
 	isUnder := true
-	for _, s := range c.Sources {
+	for _, s := range c.modules {
 		if isUnder {
 			wg.Add(1)
 			go func(sourceArg modules.Module) {

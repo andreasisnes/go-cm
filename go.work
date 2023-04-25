@@ -4,4 +4,6 @@ use (
 	.
 	./modules/environmentvariables
 	./modules/files
+	./modules/usersecrets
+	./tools/usersecrets
 )

@@ -5,38 +5,38 @@ import (
 )
 
 type Builder interface {
-	Clear()
 	Add(module modules.Module) Builder
-	Sources() []modules.Module
+	Clear()
+	Modules() []modules.Module
+	Build() Configuration
 }
 
-type builder[T any] struct {
-	sources []modules.Module
+type builder struct {
+	modules []modules.Module
 }
 
-func New[T any]() Builder {
-	return &builder[T]{
-		sources: make([]modules.Module, 0),
+func New() Builder {
+	return &builder{
+		modules: []modules.Module{},
 	}
 }
 
-func (this *builder[T]) Clear() {
-	this.sources = make([]modules.Module, 0)
-}
-
-func (this *builder[T]) Add(source modules.Module) Builder {
-	this.sources = append(this.sources, source)
-	return this
-}
-
-func (this *builder[T]) Sources() []modules.Module {
-	return this.sources
-}
-
-func (this *builder[T]) Build() Configuration {
-	for _, c := range this.sources {
-		c.Load()
+func (b *builder) Add(module modules.Module) Builder {
+	if module != nil {
+		b.modules = append(b.modules, module)
 	}
 
-	return newConfiguration(this.Sources())
+	return b
+}
+
+func (b *builder) Clear() {
+	b.modules = []modules.Module{}
+}
+
+func (b *builder) Modules() []modules.Module {
+	return b.modules
+}
+
+func (b *builder) Build() Configuration {
+	return newConfiguration(b.Modules())
 }

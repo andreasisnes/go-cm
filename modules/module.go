@@ -5,7 +5,7 @@ import "sync"
 // Used by external Sources
 func NewSourceBase(options *Options) *ModuleBase {
 	return &ModuleBase{
-		Flatmap: make(map[string]interface{}),
+		Flatmap: make(map[string]any),
 		RWTex:   sync.RWMutex{},
 		Options: options,
 	}
@@ -13,8 +13,6 @@ func NewSourceBase(options *Options) *ModuleBase {
 
 // Used by Configuration
 func (module *ModuleBase) Connect(refreshC chan Module) {
-	module.RWTex.Lock()
-	defer module.RWTex.Unlock()
 	module.RefreshC = refreshC
 }
 
@@ -25,9 +23,6 @@ func (module *ModuleBase) Exists(key string) bool {
 
 // Get Config Values
 func (module *ModuleBase) Get(key string) (value interface{}) {
-	module.RWTex.RLock()
-	defer module.RWTex.RUnlock()
-
 	if value, ok := module.Flatmap[key]; ok {
 		return value
 	}
@@ -36,9 +31,6 @@ func (module *ModuleBase) Get(key string) (value interface{}) {
 }
 
 func (module *ModuleBase) GetKeys() (result []string) {
-	module.RWTex.RLock()
-	defer module.RWTex.RUnlock()
-
 	result = make([]string, 0)
 	for key := range module.Flatmap {
 		result = append(result, key)
@@ -52,9 +44,6 @@ func (module *ModuleBase) GetOptions() *Options {
 }
 
 func (module *ModuleBase) NotifyDirtyness(externalSource Module) {
-	module.RWTex.RLock()
-	defer module.RWTex.RUnlock()
-
 	if module.RefreshC != nil {
 		module.RefreshC <- externalSource
 	}
