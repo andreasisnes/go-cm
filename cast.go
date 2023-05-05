@@ -6,104 +6,89 @@ import (
 	"github.com/spf13/cast"
 )
 
-func castAndTryAssignValue(from any, to any) any {
-	toType := reflect.TypeOf(to)
-	depth := 0
-	for toType.Kind() == reflect.Pointer {
-		toType = toType.Elem()
-		depth += 1
-	}
-
-	value := castValue(toType.Kind(), from)
-	for i := 0; i < depth-1; i++ {
-		value = pointer(value)
-	}
-
-	toValue := reflect.ValueOf(to)
-	if toValue.Kind() == reflect.Pointer {
-		toValue = toValue.Elem()
-		if toValue.Kind() == reflect.Pointer {
-			toValue.SetPointer(ptr)
-		} else {
-			toValue.Set(reflect.ValueOf(value))
-		}
-	}
-
-	return value
+func CastAndAssignValue(value any, to any) {
+	value = CastValue(value, to)
+	cValue := reflect.ValueOf(value).Convert(reflect.ValueOf(to).Type())
+	reflect.ValueOf(to).Elem().Set(cValue.Elem())
 }
 
-func castValue(tType reflect.Kind, from any) (res any) {
-	switch tType {
+func CastValue(value any, to any) any {
+	switch toType := reflect.TypeOf(to); toType.Kind() {
+	case reflect.Pointer:
+		toElemType := toType.Elem()
+		newValue := reflect.New(toElemType)
+		newValue.Elem().Set(reflect.ValueOf(CastValue(value, newValue.Elem().Interface())))
+		return newValue.Interface()
 	case reflect.String:
-		if res, ok := from.(string); ok {
+		if res, ok := value.(string); ok {
 			return res
 		}
-		return cast.ToString(from)
+		return cast.ToString(value)
 	case reflect.Int:
-		if res, ok := from.(int); ok {
+		if res, ok := value.(int); ok {
 			return res
 		}
-		return cast.ToInt(from)
+		return cast.ToInt(value)
 	case reflect.Int64:
-		if res, ok := from.(int64); ok {
+		if res, ok := value.(int64); ok {
 			return res
 		}
-		return cast.ToInt64(from)
+		return cast.ToInt64(value)
 	case reflect.Int32:
-		if res, ok := from.(int32); ok {
+		if res, ok := value.(int32); ok {
 			return res
 		}
-		return cast.ToInt32(from)
+		return cast.ToInt32(value)
 	case reflect.Int16:
-		if res, ok := from.(int16); ok {
+		if res, ok := value.(int16); ok {
 			return res
 		}
-		return cast.ToInt16(from)
+		return cast.ToInt16(value)
 	case reflect.Int8:
-		if res, ok := from.(int8); ok {
+		if res, ok := value.(int8); ok {
 			return res
 		}
-		return cast.ToInt8(from)
+		return cast.ToInt8(value)
 	case reflect.Uint:
-		if res, ok := from.(uint); ok {
+		if res, ok := value.(uint); ok {
 			return res
 		}
-		return cast.ToUint(from)
+		return cast.ToUint(value)
 	case reflect.Uint64:
-		if res, ok := from.(uint64); ok {
+		if res, ok := value.(uint64); ok {
 			return res
 		}
-		return cast.ToUint16(from)
+		return cast.ToUint16(value)
 	case reflect.Uint32:
-		if res, ok := from.(uint32); ok {
+		if res, ok := value.(uint32); ok {
 			return res
 		}
-		return cast.ToUint32(from)
+		return cast.ToUint32(value)
 	case reflect.Uint16:
-		if res, ok := from.(uint16); ok {
+		if res, ok := value.(uint16); ok {
 			return res
 		}
-		return cast.ToUint16(from)
+		return cast.ToUint16(value)
 	case reflect.Uint8:
-		if res, ok := from.(uint8); ok {
+		if res, ok := value.(uint8); ok {
 			return res
 		}
-		return cast.ToUint8(from)
+		return cast.ToUint8(value)
 	case reflect.Float64:
-		if res, ok := from.(float64); ok {
+		if res, ok := value.(float64); ok {
 			return res
 		}
-		return cast.ToFloat64(from)
+		return cast.ToFloat64(value)
 	case reflect.Float32:
-		if res, ok := from.(float32); ok {
+		if res, ok := value.(float32); ok {
 			return res
 		}
-		return cast.ToFloat32(from)
+		return cast.ToFloat32(value)
 	case reflect.Bool:
-		if res, ok := from.(bool); ok {
+		if res, ok := value.(bool); ok {
 			return res
 		}
-		return cast.ToBool(from)
+		return cast.ToBool(value)
 	// case time.Time:
 	// 	if res, ok := from.(time.Time); ok {
 	// 		return res
@@ -115,7 +100,7 @@ func castValue(tType reflect.Kind, from any) (res any) {
 	// 	}
 	// 	return cast.ToDuration(from)
 	default:
-		return from
+		return value
 	}
 }
 

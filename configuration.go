@@ -62,7 +62,7 @@ func (c *configuration) Get(key string, out any) any {
 				return value
 			}
 
-			return castAndTryAssignValue(value, out)
+			CastValue(value, &out)
 		}
 	}
 
