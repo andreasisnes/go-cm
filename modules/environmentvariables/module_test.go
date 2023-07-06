@@ -11,7 +11,7 @@ import (
 )
 
 func newConfig(option *Options) configurationmanager.Configuration {
-	return configurationmanager.New().
+	return configurationmanager.New(nil).
 		Add(New(option)).
 		Build()
 }

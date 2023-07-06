@@ -13,11 +13,17 @@ type Builder interface {
 
 type builder struct {
 	modules []modules.Module
+	options *Options
 }
 
-func New() Builder {
+func New(options *Options) Builder {
+	if options == nil {
+		options = NewDefaultOptions()
+	}
+
 	return &builder{
 		modules: []modules.Module{},
+		options: options,
 	}
 }
 
@@ -38,5 +44,5 @@ func (b *builder) Modules() []modules.Module {
 }
 
 func (b *builder) Build() Configuration {
-	return newConfiguration(b.Modules())
+	return newConfiguration(b.options, b.Modules())
 }

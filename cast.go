@@ -2,23 +2,34 @@ package configurationmanager
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/spf13/cast"
 )
 
-func CastAndAssignValue(value any, to any) {
+func CastAndAssignValue(value any, to any) any {
 	value = CastValue(value, to)
-	cValue := reflect.ValueOf(value).Convert(reflect.ValueOf(to).Type())
-	reflect.ValueOf(to).Elem().Set(cValue.Elem())
+	cValue := reflect.ValueOf(value).Elem()
+	reflect.ValueOf(to).Elem().Set(cValue)
+	return value
 }
 
 func CastValue(value any, to any) any {
 	switch toType := reflect.TypeOf(to); toType.Kind() {
 	case reflect.Pointer:
-		toElemType := toType.Elem()
-		newValue := reflect.New(toElemType)
-		newValue.Elem().Set(reflect.ValueOf(CastValue(value, newValue.Elem().Interface())))
-		return newValue.Interface()
+		// Check if packed inside interface{}
+		iValue := reflect.Indirect(reflect.ValueOf(to))
+		iType := toType.Elem()
+		if iValue.Kind() == reflect.Interface {
+			iType = iValue.Elem().Type()
+		}
+
+		ptr := reflect.New(iType)
+		h := ptr.Elem().Interface()
+		f := CastValue(value, h)
+		v := reflect.ValueOf(f)
+		ptr.Elem().Set(v)
+		return ptr.Interface()
 	case reflect.String:
 		if res, ok := value.(string); ok {
 			return res
@@ -33,6 +44,10 @@ func CastValue(value any, to any) any {
 		if res, ok := value.(int64); ok {
 			return res
 		}
+		if _, ok := to.(time.Duration); ok {
+			return cast.ToDuration(value)
+		}
+
 		return cast.ToInt64(value)
 	case reflect.Int32:
 		if res, ok := value.(int32); ok {
@@ -89,16 +104,14 @@ func CastValue(value any, to any) any {
 			return res
 		}
 		return cast.ToBool(value)
-	// case time.Time:
-	// 	if res, ok := from.(time.Time); ok {
-	// 		return res
-	// 	}
-	// 	return cast.ToTime(from)
-	// case time.Duration:
-	// 	if res, ok := from.(time.Duration); ok {
-	// 		return res
-	// 	}
-	// 	return cast.ToDuration(from)
+	case reflect.Struct:
+		if toType == reflect.TypeOf(time.Time{}) {
+			if res, ok := value.(time.Time); ok {
+				return res
+			}
+			return cast.ToTime(value)
+		}
+		return nil
 	default:
 		return value
 	}

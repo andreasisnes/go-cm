@@ -25,13 +25,13 @@ var (
 )
 
 func newConfig(option *Options) configurationmanager.Configuration {
-	return configurationmanager.New().
+	return configurationmanager.New(nil).
 		Add(New(option)).
 		Build()
 }
 
 func TestJsonObjectField(t *testing.T) {
-	config := configurationmanager.New().
+	config := configurationmanager.New(nil).
 		Add(New(&Options{File: json1})).
 		Build()
 
@@ -40,7 +40,7 @@ func TestJsonObjectField(t *testing.T) {
 }
 
 func TestJsonObjectFieldLayered(t *testing.T) {
-	config := configurationmanager.New().
+	config := configurationmanager.New(nil).
 		Add(New(&Options{File: json1})).
 		Add(New(&Options{File: json2})).
 		Build()
@@ -50,7 +50,7 @@ func TestJsonObjectFieldLayered(t *testing.T) {
 }
 
 func TestTomlObject(t *testing.T) {
-	config := configurationmanager.New().
+	config := configurationmanager.New(nil).
 		Add(New(&Options{File: toml1})).
 		Build()
 
@@ -59,7 +59,7 @@ func TestTomlObject(t *testing.T) {
 }
 
 func TestYamlObject(t *testing.T) {
-	config := configurationmanager.New().
+	config := configurationmanager.New(nil).
 		Add(New(&Options{File: yaml1})).
 		Build()
 
@@ -68,7 +68,7 @@ func TestYamlObject(t *testing.T) {
 }
 
 func TestUnkownFile(t *testing.T) {
-	config := configurationmanager.New().
+	config := configurationmanager.New(nil).
 		Add(New(&Options{
 			File: notAFile,
 			Options: modules.Options{
@@ -84,7 +84,7 @@ func TestUnkownFileAsNotOptional(t *testing.T) {
 	defer func() {
 		assert.NotNil(t, recover())
 	}()
-	configurationmanager.New().
+	configurationmanager.New(nil).
 		Add(New(&Options{File: notAFile,
 			Options: modules.Options{
 				Optional: false,
@@ -97,7 +97,7 @@ func TestJsonReloadOnChange(t *testing.T) {
 	key := "ChangedField"
 	originalValue := "UnchangedValue"
 	alteredValue := "AlteredValue"
-	config := configurationmanager.New().
+	config := configurationmanager.New(nil).
 		Add(New(&Options{File: json3,
 			Options: modules.Options{ReloadOnChange: true}})).
 		Build()

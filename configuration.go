@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"sync"
 
 	"github.com/andreasisnes/go-configuration-manager/modules"
@@ -28,14 +27,18 @@ type configuration struct {
 
 	waitgroup sync.WaitGroup
 	modules   []modules.Module
-	delimiter string
+	options   *Options
 }
 
-func newConfiguration(sources []modules.Module) Configuration {
+func newConfiguration(options *Options, sources []modules.Module) Configuration {
+	if options == nil {
+		options = NewDefaultOptions()
+	}
+
 	config := &configuration{
 		waitgroup: sync.WaitGroup{},
 		modules:   sources,
-		delimiter: ".",
+		options:   options,
 		refreshC:  make(chan modules.Module),
 		quitC:     make(chan struct{}),
 	}
@@ -53,7 +56,6 @@ func newConfiguration(sources []modules.Module) Configuration {
 
 // Get
 func (c *configuration) Get(key string, out any) any {
-	key = strings.ToUpper(key)
 	for idx := range c.modules {
 		source := c.modules[len(c.modules)-1-idx]
 		if source.Exists(key) {
@@ -62,11 +64,11 @@ func (c *configuration) Get(key string, out any) any {
 				return value
 			}
 
-			CastValue(value, &out)
+			return CastAndAssignValue(value, out)
 		}
 	}
 
-	return out
+	return nil
 }
 
 // Refresh
@@ -95,24 +97,43 @@ func (c *configuration) Refresh() (successfullyRefreshed bool) {
 
 // Unmarshal
 func (c *configuration) Unmarshal(value any) error {
-	rv := reflect.ValueOf(value)
-	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return ErrPointerNotPassed
+	c.unmarshal(value, "")
+	return nil
+}
+
+// Unmarshal
+func (c *configuration) unmarshal(value any, key string) any {
+	rValue := reflect.ValueOf(value)
+	if rValue.Kind() == reflect.Pointer {
+		rValue = rValue.Elem()
 	}
 
-	keys := make(map[string]modules.Module)
-	for _, source := range c.modules {
-		for _, key := range source.GetKeys() {
-			keys[key] = source
+	switch rValue.Kind() {
+	case reflect.Slice:
+		for i := 0; i < rValue.Len(); i++ {
+			c.unmarshal(rValue.Index(i).Addr().Interface(), c.genKey(key, fmt.Sprint(i)))
 		}
-	}
-
-	flat := make(map[string]interface{})
-	for key, source := range keys {
-		flat[key] = source.Get(key)
+	case reflect.Struct:
+		for i := 0; i < rValue.NumField(); i++ {
+			name := reflect.Indirect(rValue).Type().Field(i).Name
+			structValue := rValue.Field(i).Interface()
+			g := c.unmarshal(structValue, c.genKey(key, name))
+			rValue.Field(i).Set(reflect.ValueOf(g).Elem())
+		}
+	default:
+		value = c.Get(key, &value)
+		return value
 	}
 
 	return nil
+}
+
+func (c *configuration) genKey(key, inner string) string {
+	if key == "" {
+		return inner
+	}
+
+	return fmt.Sprintf("%s%s%s", key, c.options.Delimiter, inner)
 }
 
 // Deconstruct
