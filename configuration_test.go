@@ -3,6 +3,7 @@ package configurationmanager
 import (
 	"testing"
 
+	"github.com/andreasisnes/go-configuration-manager/modules"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,10 +13,10 @@ func TestGet(t *testing.T) {
 			name: "given two layer with same variable, should return top layer value",
 			run: func(t *testing.T) {
 				config := New(nil).
-					Add(newTestModule(func(m map[string]any) {
+					Add(newTestModule(nil, func(m map[string]any) {
 						m["test-int"] = 10
 					})).
-					Add(newTestModule(func(m map[string]any) {
+					Add(newTestModule(nil, func(m map[string]any) {
 						m["test-int"] = 100
 					})).
 					Build()
@@ -29,7 +30,7 @@ func TestGet(t *testing.T) {
 			name: "given a layer with a variable, should return nil if not found",
 			run: func(t *testing.T) {
 				config := New(nil).
-					Add(newTestModule()).
+					Add(newTestModule(nil)).
 					Build()
 
 				var strPtr *string = nil
@@ -41,26 +42,29 @@ func TestGet(t *testing.T) {
 	})
 }
 
-func TestUnmarshal(t *testing.T) {
+func TestList(t *testing.T) {
 	RunTests(t, &[]Test{
 		{
-			name: "given flat struct with int and string values should umarshal",
+			name: "",
 			run: func(t *testing.T) {
-				type Unmarshal struct {
-					Test int
-					Name string
-				}
+				config := New(&Options{
+					Delimiter: ":",
+				}).
+					Add(newTestModule(&modules.Options{
+						Delimiter: "-",
+					}, func(m map[string]any) {
+						m["test-int1"] = 10
+					})).
+					Add(newTestModule(&modules.Options{
+						Delimiter: "?",
+					}, func(m map[string]any) {
+						m["test?int2"] = 100
+					})).
+					Build()
 
-				config := New(nil).
-					Add(newTestModule(func(m map[string]any) {
-						m["Name"] = "test"
-						m["Test"] = "100"
-					})).Build()
-
-				result := Unmarshal{}
-				config.Unmarshal(&result)
-				assert.Equal(t, "test", result.Name)
-				assert.Equal(t, 100, result.Test)
+				result := config.List()
+				assert.Contains(t, result, "test:int1")
+				assert.Contains(t, result, "test:int2")
 			},
 		},
 	})

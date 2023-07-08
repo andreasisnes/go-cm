@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/andreasisnes/go-configuration-manager/modules"
@@ -15,10 +16,10 @@ var (
 )
 
 type Configuration interface {
+	List() map[string]interface{}
 	Get(key string, value any) any
 	Deconstruct() Configuration
 	Refresh() (isRefreshed bool)
-	Unmarshal(value any) error
 }
 
 type configuration struct {
@@ -54,12 +55,33 @@ func newConfiguration(options *Options, sources []modules.Module) Configuration 
 	return config
 }
 
+func (c *configuration) List() map[string]interface{} {
+	result := make(map[string]interface{})
+	for _, module := range c.modules {
+		for _, key := range module.GetKeys() {
+			moduleKey := key
+			if module.GetOptions().Delimiter != "" {
+				moduleKey = strings.ReplaceAll(key, module.GetOptions().Delimiter, c.options.Delimiter)
+			}
+
+			result[moduleKey] = c.Get(key, nil)
+		}
+	}
+
+	return result
+}
+
 // Get
 func (c *configuration) Get(key string, out any) any {
 	for idx := range c.modules {
 		source := c.modules[len(c.modules)-1-idx]
 		if source.Exists(key) {
-			value := source.Get(key)
+			sourceKey := key
+			if source.GetOptions().Delimiter != "" {
+				sourceKey = strings.ReplaceAll(key, c.options.Delimiter, source.GetOptions().Delimiter)
+			}
+
+			value := source.Get(sourceKey)
 			if out == nil {
 				return value
 			}
@@ -93,47 +115,6 @@ func (c *configuration) Refresh() (successfullyRefreshed bool) {
 	wg.Wait()
 
 	return successfullyRefreshed
-}
-
-// Unmarshal
-func (c *configuration) Unmarshal(value any) error {
-	c.unmarshal(value, "")
-	return nil
-}
-
-// Unmarshal
-func (c *configuration) unmarshal(value any, key string) any {
-	rValue := reflect.ValueOf(value)
-	if rValue.Kind() == reflect.Pointer {
-		rValue = rValue.Elem()
-	}
-
-	switch rValue.Kind() {
-	case reflect.Slice:
-		for i := 0; i < rValue.Len(); i++ {
-			c.unmarshal(rValue.Index(i).Addr().Interface(), c.genKey(key, fmt.Sprint(i)))
-		}
-	case reflect.Struct:
-		for i := 0; i < rValue.NumField(); i++ {
-			name := reflect.Indirect(rValue).Type().Field(i).Name
-			structValue := rValue.Field(i).Interface()
-			g := c.unmarshal(structValue, c.genKey(key, name))
-			rValue.Field(i).Set(reflect.ValueOf(g).Elem())
-		}
-	default:
-		value = c.Get(key, &value)
-		return value
-	}
-
-	return nil
-}
-
-func (c *configuration) genKey(key, inner string) string {
-	if key == "" {
-		return inner
-	}
-
-	return fmt.Sprintf("%s%s%s", key, c.options.Delimiter, inner)
 }
 
 // Deconstruct

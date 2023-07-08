@@ -24,6 +24,7 @@ const (
 type Options struct {
 	Optional        bool
 	ReloadOnChange  bool
+	Delimiter       string
 	SentinelOptions *SentinelOptions
 }
 

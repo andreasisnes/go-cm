@@ -17,13 +17,15 @@ func RunTests(t *testing.T, tests *[]Test) {
 	}
 }
 
-func newTestModule(opts ...func(map[string]any)) *testModule {
+func newTestModule(options *modules.Options, opts ...func(map[string]any)) *testModule {
 	t := &testModule{
 		values:     make(map[string]any),
-		ModuleBase: modules.NewSourceBase(&modules.Options{}),
+		ModuleBase: modules.NewSourceBase(options),
 	}
+
 	for _, opt := range opts {
 		opt(t.values)
+		opt(t.Flatmap)
 	}
 
 	return t
