@@ -18,6 +18,9 @@ func RunTests(t *testing.T, tests *[]Test) {
 }
 
 func newTestModule(options *modules.Options, opts ...func(map[string]any)) *testModule {
+	if options == nil {
+		options = &modules.Options{}
+	}
 	t := &testModule{
 		values:     make(map[string]any),
 		ModuleBase: modules.NewSourceBase(options),
